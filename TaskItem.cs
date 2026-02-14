@@ -24,8 +24,6 @@ namespace TaskManagerAPI
         {
             Name = string.Empty;
             Description = string.Empty;
-
-            CreatedAt = DateTime.Today;
         }
     }
 }

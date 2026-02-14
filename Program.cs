@@ -21,72 +21,71 @@ class Program
         app.UseHttpsRedirection();
 
         #region Handlers
-        app.MapGet("/tasks", (TaskDatabase db, int ? state) =>
+        app.MapGet("/tasks", async (TaskDatabase db, int? state) =>
         {
             if (state is null)
-                return Results.Ok(db.Tasks.ToList());
+                return Results.Ok(await db.Tasks.ToListAsync());
 
             if (!Enum.IsDefined(typeof(TaskState), state))
                 return Results.BadRequest("Invalid Task State.");
 
-            var result = db.Tasks.Where(task => (int)task.State == state).ToList();
+            var result = await db.Tasks.Where(task => (int)task.State == state).ToListAsync();
 
             return result.Count > 0 ? Results.Ok(result) : Results.NotFound();
         });
 
-        app.MapGet("/tasks/{id}", (TaskDatabase db, long id) =>
+        app.MapGet("/tasks/{id}", async (TaskDatabase db, long id) =>
         {
-            var task = db.Tasks.Find(id);
+            var task = await db.Tasks.FindAsync(id);
 
             return task is null ? Results.NotFound($"Task (Id: {id}) not found.") : Results.Ok(task);
         });
 
-        app.MapPost("/tasks", (TaskDatabase db, TaskRequest request) =>
+        app.MapPost("/tasks", async (TaskDatabase db, TaskRequest request) =>
         {
-            var task = request.Task;
+            if (!request.IsValid(out List<string> reasons))
+                return Results.BadRequest(new { message = "Invalid TaskItem object.", reasons });
 
-            db.Tasks.Add(task);
-            db.SaveChanges();
+            var task = request.Create();
+
+            await db.Tasks.AddAsync(task);
+            await db.SaveChangesAsync();
 
             return Results.Created($"/tasks/{task.Id}", task);
         });
 
-        app.MapDelete("/tasks/{id}", (TaskDatabase db, long id) =>
+        app.MapDelete("/tasks/{id}", async (TaskDatabase db, long id) =>
         {
-            var task = db.Tasks.Find(id);
+            var task = await db.Tasks.FindAsync(id);
 
             if (task is null)
                 return Results.NotFound($"Task (Id: {id}) not found.");
 
             db.Tasks.Remove(task);
-            db.SaveChanges();
+            await db.SaveChangesAsync();
 
             return Results.NoContent();
         });
 
-        app.MapPut("/tasks/{id}", (TaskDatabase db, long id, TaskRequest request) =>
+        app.MapPut("/tasks/{id}", async (TaskDatabase db, long id, TaskRequest request) =>
         {
             if (!request.IsValid(out List<string> reasons))
                 return Results.BadRequest(new { message = "Invalid TaskItem object.", reasons });
 
-            var task = db.Tasks.Find(id);
+            var task = request.Create() with { Id = id };
+            db.Tasks.Update(task);
 
-            if (task is null)
+            var rowsAffected = await db.SaveChangesAsync();
+
+            if (rowsAffected == 0)
                 return Results.NotFound($"Task (Id: {id}) not found.");
-
-            var newTask = request.Task;
-            newTask.Id = id;
-
-            db.Entry(task).CurrentValues.SetValues(newTask);
-
-            db.SaveChanges();
 
             return Results.Ok(task);
         });
 
-        app.MapPatch("/tasks/{id}", (TaskDatabase db, long id, JsonElement patch) =>
+        app.MapPatch("/tasks/{id}", async (TaskDatabase db, long id, JsonElement patch) =>
         {
-            var task = db.Tasks.Find(id);
+            var task = await db.Tasks.FindAsync(id);
 
             if (task is null)
                 return Results.NotFound($"Task (Id: {id}) not found.");
@@ -127,7 +126,7 @@ class Program
                     warnings.Add("'DueDate' was not patched (invalid DateTime value).");
             }
 
-            db.SaveChanges();
+            await db.SaveChangesAsync();
 
             return warnings.Count > 0 ? Results.Ok(new { task, warnings }) : Results.Ok(task);
         });

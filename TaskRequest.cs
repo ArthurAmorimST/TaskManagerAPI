@@ -2,19 +2,13 @@
 {
     public record TaskRequest(string Name, string Description, TaskState State, DateTime DueDate)
     {
-        public TaskItem Task
+        public TaskItem Create() => new TaskItem
         {
-            get
-            {
-                return new TaskItem
-                {
-                    Name = Name,
-                    Description = Description,
-                    State = State,
-                    DueDate = DueDate,
-                };
-            }
-        }
+            Name = Name ?? "New Task",
+            Description = Description ?? "",
+            State = State,
+            DueDate = DueDate
+        };
 
         public bool IsValid(out List<string> reasons)
         {
