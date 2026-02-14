@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using TaskManagerAPI;
 
 class Program
@@ -11,6 +12,28 @@ class Program
         builder.Services.AddOpenApi();
         builder.Services.AddDbContext<TaskDatabase>(options => options.UseSqlite("Data source=tasks.db"));
 
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            {
+                var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "global";
+
+                return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+                {
+                    Window = TimeSpan.FromSeconds(8),
+                    PermitLimit = 4,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 2
+                });
+            });
+
+            options.OnRejected = async (context, token) =>
+            {
+                context.HttpContext.Response.StatusCode = 429;
+                await context.HttpContext.Response.WriteAsync("Too many requests!", token);
+            };
+        });
+
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -18,6 +41,7 @@ class Program
             app.MapOpenApi();
         }
 
+        app.UseRateLimiter();
         app.UseHttpsRedirection();
 
         #region Handlers
