@@ -10,7 +10,7 @@ using TaskManagerAPI;
 
 namespace TaskManagerAPI.Migrations
 {
-    [DbContext(typeof(TaskDatabase))]
+    [DbContext(typeof(AppDbContext))]
     [Migration("20260214161455_CreatedAtValueGenerated")]
     partial class CreatedAtValueGenerated
     {

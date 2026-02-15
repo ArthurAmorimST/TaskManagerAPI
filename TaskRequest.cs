@@ -2,8 +2,9 @@
 {
     public record TaskRequest(string Name, string Description, TaskState State, DateTime DueDate)
     {
-        public TaskItem Create() => new TaskItem
+        public TaskItem Create(long userId) => new TaskItem
         {
+            UserId = userId,
             Name = Name ?? "New Task",
             Description = Description ?? "",
             State = State,
